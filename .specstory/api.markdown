@@ -275,3 +275,19 @@ DELETE /api/supplier-archive/11
   }
 }
 ```
+
+*高级查询操作符**:
+
+**数值字段（INT、DECIMAL）**:
+- `字段名_gt`: 大于
+- `字段名_gte`: 大于等于
+- `字段名_lt`: 小于
+- `字段名_lte`: 小于等于
+- `字段名_eq`: 等于
+
+**字符串字段（VARCHAR）**:
+- `字段名`: 模糊查询（LIKE %value%）
+
+**日期/时间字段（TIMESTAMP、DATE）**:
+- `字段名_start`: 开始时间
+- `字段名_end`: 结束时间

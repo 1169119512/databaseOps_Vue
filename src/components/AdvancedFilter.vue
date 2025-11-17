@@ -211,19 +211,38 @@ const removeFilter = (index) => {
   filterList.value.splice(index, 1)
 }
 
-// 构建筛选参数
+// 构建筛选参数（支持同一字段多个条件）
 const buildFilters = () => {
   const filters = {}
   
   filterList.value.forEach(filter => {
     if (!filter.fieldName) return
     
-    filters[filter.fieldName] = {
-      type: filter.type,
-      operator: filter.operator,
-      value: filter.value,
-      startDate: filter.startDate,
-      endDate: filter.endDate
+    const fieldName = filter.fieldName
+    
+    // 如果同一字段已存在筛选条件，转换为数组
+    if (filters[fieldName]) {
+      // 已存在且不是数组，转为数组
+      if (!Array.isArray(filters[fieldName])) {
+        filters[fieldName] = [filters[fieldName]]
+      }
+      // 添加新条件
+      filters[fieldName].push({
+        type: filter.type,
+        operator: filter.operator,
+        value: filter.value,
+        startDate: filter.startDate,
+        endDate: filter.endDate
+      })
+    } else {
+      // 首次添加该字段的筛选条件
+      filters[fieldName] = {
+        type: filter.type,
+        operator: filter.operator,
+        value: filter.value,
+        startDate: filter.startDate,
+        endDate: filter.endDate
+      }
     }
   })
   

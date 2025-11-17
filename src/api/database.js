@@ -22,55 +22,72 @@ export class DatabaseAPI {
     Object.keys(filters).forEach(key => {
       const filter = filters[key]
       
-      if (!filter || filter.value === undefined || filter.value === null || filter.value === '') {
-        return
-      }
+      if (!filter) return
+      
+      // 处理数组形式的多个条件（同一字段多个筛选）
+      const filterArray = Array.isArray(filter) ? filter : [filter]
+      
+      filterArray.forEach(singleFilter => {
+        // 跳过空值（日期类型除外，因为可能只有startDate/endDate）
+        if (!singleFilter) return
+        
+        const hasValue = singleFilter.value !== undefined && 
+                        singleFilter.value !== null && 
+                        singleFilter.value !== ''
+        const hasDateRange = singleFilter.startDate || singleFilter.endDate
+        
+        if (!hasValue && !hasDateRange) return
 
-      const { type, operator, value } = filter
+        const { type, operator, value } = singleFilter
 
-      switch (type) {
-        case 'int':
-        case 'decimal':
-          // 数值型：支持 >、<、=、>=、<=
-          switch (operator) {
-            case '>':
-              params[`${key}_gt`] = value
-              break
-            case '>=':
-              params[`${key}_gte`] = value
-              break
-            case '<':
-              params[`${key}_lt`] = value
-              break
-            case '<=':
-              params[`${key}_lte`] = value
-              break
-            case '=':
+        switch (type) {
+          case 'int':
+          case 'decimal':
+            // 数值型：支持 >、<、=、>=、<=
+            switch (operator) {
+              case '>':
+                params[`${key}_gt`] = value
+                break
+              case '>=':
+                params[`${key}_gte`] = value
+                break
+              case '<':
+                params[`${key}_lt`] = value
+                break
+              case '<=':
+                params[`${key}_lte`] = value
+                break
+              case '=':
+                params[`${key}_eq`] = value
+                break
+            }
+            break
+            
+          case 'varchar':
+            // 字符串型：模糊查询（直接使用字段名）
+            if (hasValue) {
               params[key] = value
-              break
-          }
-          break
-          
-        case 'varchar':
-          // 字符串型：模糊查询
-          params[`${key}_like`] = value
-          break
-          
-        case 'date':
-        case 'timestamp':
-          // 日期型：范围查询
-          if (filter.startDate) {
-            params[`${key}_start`] = filter.startDate
-          }
-          if (filter.endDate) {
-            params[`${key}_end`] = filter.endDate
-          }
-          break
-          
-        default:
-          // 默认精确匹配
-          params[key] = value
-      }
+            }
+            break
+            
+          case 'date':
+          case 'timestamp':
+            // 日期型：范围查询
+            if (singleFilter.startDate) {
+              params[`${key}_start`] = singleFilter.startDate
+            }
+            if (singleFilter.endDate) {
+              params[`${key}_end`] = singleFilter.endDate
+            }
+            break
+            
+          default:
+            // 默认精确匹配
+            if (hasValue) {
+              params[key] = value
+            }
+        }
+      })
     })
 
     return params
