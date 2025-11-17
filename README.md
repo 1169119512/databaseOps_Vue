@@ -109,7 +109,7 @@ npm run build
 3. 填写连接信息：
    - **连接名称**：自定义名称（如：供应商数据库）
    - **后端地址**：后端 API 地址（如：`http://localhost:5000` 或 `https://xxx.frp.sakura.com`）
-   - **表名**：要操作的表名（如：`supplier-archive`）
+   - **模块名**：要操作的模块名（如：`supplier-archive`）
    - **描述**：可选的连接描述
 4. 点击「测试」按钮测试连接
 5. 点击「激活」按钮激活该连接

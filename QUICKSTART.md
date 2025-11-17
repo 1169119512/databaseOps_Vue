@@ -25,7 +25,7 @@ npm run dev
 ```
 连接名称：供应商数据库
 后端地址：http://localhost:5000
-表名：supplier-archive
+模块名：supplier-archive
 描述：供应商档案管理系统
 ```
 

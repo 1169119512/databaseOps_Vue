@@ -1,9 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { DatabaseAPI } from '@/api/database'
+import axios from 'axios'
 
 /**
  * 数据库连接管理Store
+ * 使用配置文件存储（connections.json）
  */
 export const useDatabaseStore = defineStore('database', () => {
   // 存储的数据库连接列表
@@ -12,37 +14,63 @@ export const useDatabaseStore = defineStore('database', () => {
   // 当前激活的连接
   const activeConnectionId = ref(null)
 
-  // 从localStorage加载连接配置
-  const loadConnections = () => {
+  // 配置API基础地址
+  const configApiBase = '/config-api'
+
+  // 从配置文件加载连接配置
+  const loadConnections = async () => {
     try {
-      const saved = localStorage.getItem('database_connections')
-      if (saved) {
-        connections.value = JSON.parse(saved)
+      const response = await axios.get(`${configApiBase}/connections`)
+      if (response.data.code === 200) {
+        connections.value = response.data.data || []
       }
       
+      // activeConnectionId仍然存在localStorage（不需要持久化到文件）
       const savedActive = localStorage.getItem('active_connection_id')
       if (savedActive) {
         activeConnectionId.value = savedActive
       }
     } catch (error) {
       console.error('加载数据库连接配置失败：', error)
+      connections.value = []
     }
   }
 
-  // 保存连接配置到localStorage
-  const saveConnections = () => {
+  // 保存单个连接到配置文件
+  const saveConnection = async (connection) => {
     try {
-      localStorage.setItem('database_connections', JSON.stringify(connections.value))
-      if (activeConnectionId.value) {
-        localStorage.setItem('active_connection_id', activeConnectionId.value)
-      }
+      const response = await axios.post(`${configApiBase}/connections`, connection)
+      return response.data.code === 201
     } catch (error) {
-      console.error('保存数据库连接配置失败：', error)
+      console.error('保存连接配置失败：', error)
+      return false
+    }
+  }
+
+  // 更新单个连接
+  const updateConnectionInFile = async (id, updates) => {
+    try {
+      const response = await axios.put(`${configApiBase}/connections/${id}`, updates)
+      return response.data.code === 200
+    } catch (error) {
+      console.error('更新连接配置失败：', error)
+      return false
+    }
+  }
+
+  // 删除单个连接
+  const deleteConnectionFromFile = async (id) => {
+    try {
+      const response = await axios.delete(`${configApiBase}/connections/${id}`)
+      return response.data.code === 200
+    } catch (error) {
+      console.error('删除连接配置失败：', error)
+      return false
     }
   }
 
   // 添加连接
-  const addConnection = (connection) => {
+  const addConnection = async (connection) => {
     const newConnection = {
       id: Date.now().toString(),
       name: connection.name,
@@ -52,32 +80,43 @@ export const useDatabaseStore = defineStore('database', () => {
       createdAt: new Date().toISOString()
     }
     
-    connections.value.push(newConnection)
-    saveConnections()
-    
-    return newConnection
+    const success = await saveConnection(newConnection)
+    if (success) {
+      connections.value.push(newConnection)
+      return newConnection
+    }
+    return null
   }
 
   // 更新连接
-  const updateConnection = (id, updates) => {
-    const index = connections.value.findIndex(c => c.id === id)
-    if (index !== -1) {
-      connections.value[index] = {
-        ...connections.value[index],
-        ...updates,
-        updatedAt: new Date().toISOString()
+  const updateConnection = async (id, updates) => {
+    const updatedData = {
+      ...updates,
+      updatedAt: new Date().toISOString()
+    }
+    
+    const success = await updateConnectionInFile(id, updatedData)
+    if (success) {
+      const index = connections.value.findIndex(c => c.id === id)
+      if (index !== -1) {
+        connections.value[index] = {
+          ...connections.value[index],
+          ...updatedData
+        }
       }
-      saveConnections()
       return true
     }
     return false
   }
 
   // 删除连接
-  const deleteConnection = (id) => {
-    const index = connections.value.findIndex(c => c.id === id)
-    if (index !== -1) {
-      connections.value.splice(index, 1)
+  const deleteConnection = async (id) => {
+    const success = await deleteConnectionFromFile(id)
+    if (success) {
+      const index = connections.value.findIndex(c => c.id === id)
+      if (index !== -1) {
+        connections.value.splice(index, 1)
+      }
       
       // 如果删除的是当前激活的连接，清空激活状态
       if (activeConnectionId.value === id) {
@@ -85,10 +124,43 @@ export const useDatabaseStore = defineStore('database', () => {
         localStorage.removeItem('active_connection_id')
       }
       
-      saveConnections()
       return true
     }
     return false
+  }
+
+  // 批量导入连接
+  const batchImportConnections = async (newConnections) => {
+    try {
+      const response = await axios.post(`${configApiBase}/connections/batch`, newConnections)
+      
+      if (response.data.code === 200) {
+        await loadConnections()
+        return response.data.data.count
+      }
+      
+      return 0
+    } catch (error) {
+      console.error('批量导入失败：', error)
+      return 0
+    }
+  }
+
+  // 清空所有连接
+  const clearAllConnections = async () => {
+    try {
+      const response = await axios.delete(`${configApiBase}/connections`)
+      if (response.data.code === 200) {
+        connections.value = []
+        activeConnectionId.value = null
+        localStorage.removeItem('active_connection_id')
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('清空连接失败：', error)
+      return false
+    }
   }
 
   // 设置激活连接
@@ -138,7 +210,9 @@ export const useDatabaseStore = defineStore('database', () => {
     setActiveConnection,
     getActiveAPI,
     getAPIById,
-    loadConnections
+    loadConnections,
+    batchImportConnections,
+    clearAllConnections
   }
 })
 

@@ -50,11 +50,11 @@
           <div>
             <h3 style="margin: 0;">{{ currentConnection.name }}</h3>
             <span style="color: #909399; font-size: 13px;">
-              表名：{{ currentConnection.tableName }} | 
+              模块：{{ currentConnection.tableName }} | 
               地址：{{ currentConnection.baseURL }}
             </span>
           </div>
-          <div>
+          <div style="display: flex; gap: 8px;">
             <el-button @click="loadTableSchema">
               <el-icon><Refresh /></el-icon>
               刷新结构
@@ -86,18 +86,27 @@
         border
         style="width: 100%;"
         max-height="500"
+        @selection-change="handleSelectionChange"
       >
+        <el-table-column type="selection" width="55" fixed="left" />
         <el-table-column type="index" label="序号" width="60" fixed="left" />
         <el-table-column
           v-for="field in displayFields"
-          :key="field"
-          :prop="field"
-          :label="field"
+          :key="field.name"
+          :prop="field.name"
           min-width="150"
           show-overflow-tooltip
         >
+          <template #header>
+            <div style="display: flex; flex-direction: column; align-items: flex-start;">
+              <span style="font-weight: 600;">{{ field.name }}</span>
+              <span style="color: #909399; font-size: 12px; font-weight: normal;">
+                {{ field.comment }}
+              </span>
+            </div>
+          </template>
           <template #default="{ row }">
-            {{ formatValue(row[field]) }}
+            {{ formatValue(row[field.name]) }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="180" fixed="right">
@@ -112,8 +121,33 @@
         </el-table-column>
       </el-table>
 
-      <!-- 分页 -->
-      <div class="pagination-container">
+      <!-- 底部操作栏 -->
+      <div class="table-footer">
+        <!-- 批量操作 -->
+        <div class="batch-actions">
+          <el-button
+            type="danger"
+            @click="handleBatchDelete"
+            :disabled="selectedRows.length === 0"
+            size="default"
+          >
+            <el-icon><Delete /></el-icon>
+            批量删除
+            <el-tag
+              v-if="selectedRows.length > 0"
+              type="danger"
+              size="small"
+              style="margin-left: 8px;"
+            >
+              {{ selectedRows.length }}
+            </el-tag>
+          </el-button>
+          <span v-if="selectedRows.length > 0" style="color: #909399; font-size: 13px; margin-left: 12px;">
+            已选中 {{ selectedRows.length }} 条记录
+          </span>
+        </div>
+
+        <!-- 分页 -->
         <el-pagination
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.pageSize"
@@ -142,8 +176,15 @@
         <el-form-item
           v-for="field in editableFields"
           :key="field.name"
-          :label="field.name"
         >
+          <template #label>
+            <div style="display: flex; flex-direction: column; align-items: flex-start;">
+              <span>{{ field.name }}</span>
+              <span style="color: #909399; font-size: 12px; font-weight: normal;">
+                {{ field.comment }}
+              </span>
+            </div>
+          </template>
           <!-- 数值类型 -->
           <el-input-number
             v-if="field.type === 'int' || field.type === 'decimal'"
@@ -195,8 +236,8 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, Setting } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
+import { Plus, Refresh, Setting, Delete } from '@element-plus/icons-vue'
 import { useDatabaseStore } from '@/stores/database'
 import AdvancedFilter from '@/components/AdvancedFilter.vue'
 
@@ -222,9 +263,10 @@ const getCurrentAPI = () => {
 const loading = ref(false)
 const submitting = ref(false)
 const tableData = ref([])
-const tableSchema = ref({}) // 字段名 -> 类型
+const tableSchema = ref({ fields: [], tableComment: '' }) // 表结构信息
 const displayFields = ref([]) // 显示的字段列表
 const activeCollapse = ref(['filter'])
+const selectedRows = ref([]) // 选中的行
 
 const pagination = reactive({
   page: 1,
@@ -241,7 +283,8 @@ const currentFilters = ref({})
 
 // 可编辑的字段（排除主键和自动更新字段）
 const editableFields = computed(() => {
-  return tableFields.value.filter(field => {
+  if (!tableSchema.value.fields) return []
+  return tableSchema.value.fields.filter(field => {
     // 排除常见的自动字段
     const autoFields = ['ZBXH', 'GXSJ', 'id', 'created_at', 'updated_at']
     return !autoFields.includes(field.name)
@@ -250,10 +293,8 @@ const editableFields = computed(() => {
 
 // 表字段列表（用于筛选组件）
 const tableFields = computed(() => {
-  return Object.keys(tableSchema.value).map(name => ({
-    name,
-    type: tableSchema.value[name]
-  }))
+  if (!tableSchema.value.fields) return []
+  return tableSchema.value.fields
 })
 
 // 获取主键字段
@@ -261,18 +302,19 @@ const getPrimaryKey = () => {
   // 常见主键字段名
   const pkFields = ['ZBXH', 'id', 'ID']
   for (const field of pkFields) {
-    if (displayFields.value.includes(field)) {
+    const found = displayFields.value.find(f => f.name === field)
+    if (found) {
       return field
     }
   }
-  return displayFields.value[0] // 默认第一个字段
+  return displayFields.value[0]?.name // 默认第一个字段
 }
 
 // 连接切换处理
 const handleConnectionChange = () => {
   // 重置数据
   tableData.value = []
-  tableSchema.value = {}
+  tableSchema.value = { fields: [], tableComment: '' }
   displayFields.value = []
   pagination.page = 1
   currentFilters.value = {}
@@ -293,9 +335,12 @@ const loadTableSchema = async () => {
       currentConnection.value.tableName
     )
     tableSchema.value = schema
-    displayFields.value = Object.keys(schema)
+    displayFields.value = schema.fields.map(f => ({
+      name: f.name,
+      comment: f.comment
+    }))
     
-    if (Object.keys(schema).length > 0) {
+    if (schema.fields.length > 0) {
       ElMessage.success('表结构加载成功')
       loadTableData()
     } else {
@@ -441,6 +486,11 @@ const handleSubmit = async () => {
   }
 }
 
+// 表格选择变化
+const handleSelectionChange = (selection) => {
+  selectedRows.value = selection
+}
+
 // 删除记录
 const handleDelete = (row) => {
   const pkField = getPrimaryKey()
@@ -465,6 +515,105 @@ const handleDelete = (row) => {
         loadTableData()
       } catch (error) {
         ElMessage.error('删除失败：' + error.message)
+      }
+    })
+    .catch(() => {})
+}
+
+// 批量删除
+const handleBatchDelete = () => {
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning('请先选择要删除的记录')
+    return
+  }
+
+  const pkField = getPrimaryKey()
+  const ids = selectedRows.value.map(row => row[pkField])
+
+  ElMessageBox.confirm(
+    `确定要删除选中的 ${selectedRows.value.length} 条记录吗？`,
+    '批量删除确认',
+    {
+      confirmButtonText: '确定删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+      distinguishCancelAndClose: true
+    }
+  )
+    .then(async () => {
+      const api = getCurrentAPI()
+      if (!api || !currentConnection.value) return
+
+      const loading = ElMessage({
+        message: '正在删除...',
+        type: 'info',
+        duration: 0
+      })
+
+      try {
+        const response = await api.batchDelete(currentConnection.value.tableName, ids)
+        loading.close()
+
+        const { deleted_count, failed_ids } = response.data
+
+        // 情况1：全部成功
+        if (failed_ids.length === 0) {
+          ElNotification({
+            title: '删除成功',
+            message: `成功删除 ${deleted_count} 条记录`,
+            type: 'success',
+            duration: 3000
+          })
+        }
+        // 情况2：部分成功
+        else if (deleted_count > 0) {
+          const failedList = failed_ids.map(item => 
+            `ID ${item.id}: ${item.reason}`
+          ).join('\n')
+
+          ElNotification({
+            title: '部分删除成功',
+            dangerouslyUseHTMLString: true,
+            message: `
+              <div>
+                <p style="margin: 0 0 8px 0;">成功删除 ${deleted_count} 条，失败 ${failed_ids.length} 条</p>
+                <div style="max-height: 200px; overflow-y: auto; font-size: 12px; color: #909399;">
+                  ${failed_ids.map(item => `<div>• ID ${item.id}: ${item.reason}</div>`).join('')}
+                </div>
+              </div>
+            `,
+            type: 'warning',
+            duration: 5000
+          })
+        }
+        // 情况3：全部失败
+        else {
+          const failedList = failed_ids.map(item => 
+            `ID ${item.id}: ${item.reason}`
+          ).join('\n')
+
+          ElNotification({
+            title: '删除失败',
+            dangerouslyUseHTMLString: true,
+            message: `
+              <div>
+                <p style="margin: 0 0 8px 0;">所有记录删除失败</p>
+                <div style="max-height: 200px; overflow-y: auto; font-size: 12px; color: #909399;">
+                  ${failed_ids.map(item => `<div>• ID ${item.id}: ${item.reason}</div>`).join('')}
+                </div>
+              </div>
+            `,
+            type: 'error',
+            duration: 5000
+          })
+        }
+
+        // 刷新数据并清空选中
+        loadTableData()
+        selectedRows.value = []
+      } catch (error) {
+        loading.close()
+        ElMessage.error('批量删除失败：' + error.message)
       }
     })
     .catch(() => {})
@@ -505,8 +654,30 @@ watch(() => route.params.connectionId, (newId) => {
   align-items: center;
 }
 
-.pagination-container {
+.table-footer {
   margin-top: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .table-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .batch-actions {
+    justify-content: center;
+  }
 }
 </style>
 

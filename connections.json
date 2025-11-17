@@ -1,0 +1,108 @@
+{
+  "connections": [
+    {
+      "id": "1763371177375_0",
+      "name": "供应商档案",
+      "baseURL": "https://frp-fun.com:16570",
+      "tableName": "supplier-archive",
+      "description": "供应商档案管理子系统",
+      "createdAt": "2025-11-17T09:19:37.375Z"
+    },
+    {
+      "id": "1763371177375_1",
+      "name": "发票池表头",
+      "baseURL": "https://frp-fun.com:16570",
+      "tableName": "invoice-header",
+      "description": "发票池表头管理子系统",
+      "createdAt": "2025-11-17T09:19:37.375Z"
+    },
+    {
+      "id": "1763371177375_2",
+      "name": "发票池明细",
+      "baseURL": "https://frp-fun.com:16570",
+      "tableName": "invoice-detail",
+      "description": "发票池明细管理子系统",
+      "createdAt": "2025-11-17T09:19:37.375Z"
+    },
+    {
+      "id": "1763371177375_3",
+      "name": "费用映射",
+      "baseURL": "https://frp-fun.com:16570",
+      "tableName": "expense-mapping",
+      "description": "费用映射配置子系统",
+      "createdAt": "2025-11-17T09:19:37.375Z"
+    },
+    {
+      "id": "1763371177375_4",
+      "name": "客户分部配置",
+      "baseURL": "https://frp-fun.com:16570",
+      "tableName": "customer-branch-config",
+      "description": "客户分部配置子系统",
+      "createdAt": "2025-11-17T09:19:37.375Z"
+    },
+    {
+      "id": "1763371177375_5",
+      "name": "法人主体配置",
+      "baseURL": "https://frp-fun.com:16570",
+      "tableName": "legal-entity-config",
+      "description": "法人主体配置子系统",
+      "createdAt": "2025-11-17T09:19:37.375Z"
+    },
+    {
+      "id": "1763371177375_6",
+      "name": "用户管理",
+      "baseURL": "https://frp-fun.com:16570",
+      "tableName": "user-management",
+      "description": "用户管理子系统",
+      "createdAt": "2025-11-17T09:19:37.375Z"
+    },
+    {
+      "id": "1763371177375_7",
+      "name": "税率配置",
+      "baseURL": "https://frp-fun.com:16570",
+      "tableName": "tax-calculation-config",
+      "description": "税率配置子系统",
+      "createdAt": "2025-11-17T09:19:37.375Z"
+    },
+    {
+      "id": "1763371177375_8",
+      "name": "管理员配置",
+      "baseURL": "https://frp-fun.com:16570",
+      "tableName": "admin-config",
+      "description": "管理员配置子系统",
+      "createdAt": "2025-11-17T09:19:37.375Z"
+    },
+    {
+      "id": "1763371177375_9",
+      "name": "红字信息表主表",
+      "baseURL": "https://frp-fun.com:16570",
+      "tableName": "red-letter-header",
+      "description": "红字信息表主表子系统",
+      "createdAt": "2025-11-17T09:19:37.375Z"
+    },
+    {
+      "id": "1763371177375_10",
+      "name": "红字信息明细表",
+      "baseURL": "https://frp-fun.com:16570",
+      "tableName": "red-letter-detail",
+      "description": "红字信息明细表子系统",
+      "createdAt": "2025-11-17T09:19:37.375Z"
+    },
+    {
+      "id": "1763371177375_11",
+      "name": "角色管理",
+      "baseURL": "https://frp-fun.com:16570",
+      "tableName": "role-management",
+      "description": "角色管理子系统",
+      "createdAt": "2025-11-17T09:19:37.375Z"
+    },
+    {
+      "id": "1763371177375_12",
+      "name": "项目管理",
+      "baseURL": "https://frp-fun.com:16570",
+      "tableName": "project-management",
+      "description": "项目管理子系统",
+      "createdAt": "2025-11-17T09:19:37.375Z"
+    }
+  ]
+}

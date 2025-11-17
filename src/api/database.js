@@ -138,20 +138,58 @@ export class DatabaseAPI {
   }
 
   /**
-   * 获取表字段信息（通过分页查询第一条数据）
+   * 批量删除记录
+   * @param {String} tableName - 表名
+   * @param {Array} ids - 记录ID数组
+   * @returns {Object} - { deleted_count, failed_ids }
+   */
+  async batchDelete(tableName, ids) {
+    return this.request.post(`/api/${tableName}/batch-delete`, { ids })
+  }
+
+  /**
+   * 获取表字段信息（新接口：包含字段名和注释）
+   * @param {String} tableName - 表名
+   * @returns {Object} - { fields: [{field_name, comment, type}], table_comment }
+   */
+  async getTableFields(tableName) {
+    try {
+      const response = await this.request.get(`/api/${tableName}/fields`)
+      if (response.data && response.data.fields) {
+        return {
+          fields: response.data.fields,
+          tableName: response.data.table_name,
+          tableComment: response.data.table_comment
+        }
+      }
+      return { fields: [], tableName: '', tableComment: '' }
+    } catch (error) {
+      console.error('获取表字段信息失败：', error)
+      // 如果新接口失败，降级到旧方法
+      return this.getTableSchemaFallback(tableName)
+    }
+  }
+
+  /**
+   * 获取表字段信息（降级方案：通过分页查询第一条数据）
    * @param {String} tableName - 表名
    */
-  async getTableSchema(tableName) {
+  async getTableSchemaFallback(tableName) {
     try {
       const response = await this.getList(tableName, 1, 1)
       if (response.data && response.data.data && response.data.data.length > 0) {
         const firstRecord = response.data.data[0]
-        return Object.keys(firstRecord)
+        const fields = Object.keys(firstRecord).map(fieldName => ({
+          field_name: fieldName,
+          comment: fieldName, // 降级方案：注释就是字段名
+          type: this.inferFieldType(firstRecord[fieldName])
+        }))
+        return { fields, tableName: '', tableComment: '' }
       }
-      return []
+      return { fields: [], tableName: '', tableComment: '' }
     } catch (error) {
       console.error('获取表结构失败：', error)
-      return []
+      return { fields: [], tableName: '', tableComment: '' }
     }
   }
 
@@ -186,26 +224,57 @@ export class DatabaseAPI {
   }
 
   /**
-   * 获取表结构及类型信息
+   * 获取表结构及类型信息（增强版：包含注释）
    * @param {String} tableName - 表名
+   * @returns {Object} - { fields: [{name, type, comment}], tableComment }
    */
   async getTableSchemaWithTypes(tableName) {
     try {
+      // 1. 获取字段信息（字段名+注释）
+      const fieldInfo = await this.getTableFields(tableName)
+      
+      // 2. 获取第一条数据用于推断类型
       const response = await this.getList(tableName, 1, 1)
+      
       if (response.data && response.data.data && response.data.data.length > 0) {
         const firstRecord = response.data.data[0]
-        const schema = {}
         
-        Object.keys(firstRecord).forEach(key => {
-          schema[key] = this.inferFieldType(firstRecord[key])
+        // 3. 合并字段信息和类型信息
+        const fields = fieldInfo.fields.map(field => {
+          const fieldName = field.field_name
+          const fieldValue = firstRecord[fieldName]
+          
+          return {
+            name: fieldName,
+            comment: field.comment || fieldName,
+            type: this.inferFieldType(fieldValue)
+          }
         })
         
-        return schema
+        return {
+          fields,
+          tableComment: fieldInfo.tableComment
+        }
       }
-      return {}
+      
+      // 如果没有数据，只返回字段信息
+      if (fieldInfo.fields.length > 0) {
+        const fields = fieldInfo.fields.map(field => ({
+          name: field.field_name,
+          comment: field.comment || field.field_name,
+          type: 'varchar' // 默认类型
+        }))
+        
+        return {
+          fields,
+          tableComment: fieldInfo.tableComment
+        }
+      }
+      
+      return { fields: [], tableComment: '' }
     } catch (error) {
       console.error('获取表结构失败：', error)
-      return {}
+      return { fields: [], tableComment: '' }
     }
   }
 }
